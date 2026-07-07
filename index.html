@@ -734,6 +734,39 @@ body.modal-open{overflow:hidden}
   z-index:1;
 }
 
+/* Performance fixes */
+html{scroll-behavior:auto}
+.page{animation:none!important}
+.bg{
+  filter:brightness(.24) saturate(1.05)!important;
+  transform:none!important;
+}
+.card,
+.bottomNav,
+.liveToast,
+.tripPill{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.card,
+.heroPhoto,
+.popover,
+.sheet,
+.bottomNav{
+  box-shadow:0 12px 32px rgba(0,0,0,.34)!important;
+}
+.imageCard:before{
+  filter:brightness(.78)!important;
+}
+.showCard,
+.viewCard,
+.smallRow,
+.activeTripStep,
+.repairStep{
+  content-visibility:auto;
+  contain-intrinsic-size:120px;
+}
+
 </style>
 </head>
 <body>
@@ -1183,7 +1216,7 @@ function go(id){
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   [...document.querySelectorAll(".tab")].find(t=>t.textContent.toLowerCase().includes(id==="today"?"today":id))?.classList.add("active");
-  window.scrollTo({top:0,behavior:"smooth"});
+  window.scrollTo({top:0,behavior:"auto"});
 }
 function renderAll(){
   renderToday();
@@ -1215,7 +1248,7 @@ function renderToday(){
 function openNextShow(){
   const upcoming = Object.entries(state.shows).filter(([d,s])=>d>=k(appToday)&&!s.completed).sort();
   go("tours");
-  if(upcoming[0]) setTimeout(()=>document.querySelector(`[data-show-date="${upcoming[0][0]}"]`)?.scrollIntoView({behavior:"smooth",block:"center"}),150);
+  if(upcoming[0]) setTimeout(()=>document.querySelector(`[data-show-date="${upcoming[0][0]}"]`)?.scrollIntoView({behavior:"auto",block:"center"}),150);
 }
 function renderCalendar(target, full){
   if(!target) return;
@@ -1569,18 +1602,62 @@ function deleteShow(){
   closeEdit();
   save();
 }
-function handleUpload(e){
+function fileToDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function imageToCompressedDataURL(file,maxSize=1200,quality=.76){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const scale=Math.min(1,maxSize/Math.max(img.width,img.height));
+        const width=Math.max(1,Math.round(img.width*scale));
+        const height=Math.max(1,Math.round(img.height*scale));
+        const canvas=document.createElement("canvas");
+        canvas.width=width;
+        canvas.height=height;
+        const ctx=canvas.getContext("2d");
+        ctx.drawImage(img,0,0,width,height);
+        resolve(canvas.toDataURL("image/jpeg",quality));
+      };
+      img.onerror=reject;
+      img.src=reader.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleUpload(e){
   const file=e.target.files[0];
   if(!file || !selectedDate) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
+
+  try{
+    let data=file.type && file.type.startsWith("image/")
+      ? await imageToCompressedDataURL(file,1200,.76)
+      : await fileToDataURL(file);
+
     const s=show(selectedDate);
     if(!s.files) s.files=[];
-    s.files.push({name:file.name,type:file.type,data:reader.result});
+    s.files.push({
+      name:file.name,
+      type:file.type && file.type.startsWith("image/") ? "image/jpeg" : file.type,
+      data
+    });
     persist();
     renderFilePreview();
-  };
-  reader.readAsDataURL(file);
+    e.target.value="";
+  }catch(err){
+    console.error("Upload failed",err);
+    alert("Upload failed. Try a smaller image or screenshot.");
+  }
 }
 function renderFilePreview(){
   const s=show(selectedDate);
@@ -2036,7 +2113,7 @@ document.addEventListener("click",function(e){
   if(txt==="open trip") repairOpen(date,true);
 }, true);
 setTimeout(repairPatchButtons,300);
-setInterval(repairPatchButtons,700);
+// Performance fix: removed constant repairPatchButtons polling. Render/click handlers patch buttons when needed.
 
 
 /* Realtime sync + infinite window stability */
@@ -2127,7 +2204,7 @@ if(typeof saveShow === "function"){
     liveQueueRender("Show saved");
     setTimeout(()=>{
       if(typeof go==="function") go("tours");
-      document.querySelector(`[data-show-date="${targetDate}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
+      document.querySelector(`[data-show-date="${targetDate}"]`)?.scrollIntoView({behavior:"auto",block:"center"});
       if(typeof repairPatchButtons==="function") repairPatchButtons();
     },60);
   };
@@ -2288,17 +2365,23 @@ document.addEventListener("input",e=>{
     }
     selectedDate=date;
     localStorage.setItem(KEY,JSON.stringify(state));
-    liveQueueRender();
-  },350);
+    // Performance fix: do not repaint the whole app on every keystroke while editing.
+    // The screen is refreshed when the user taps Save, changes page, or closes the sheet.
+  },450);
 }, true);
 
 /* Watch localStorage-style data changes from this window and repaint often */
-setInterval(()=>{
-  if(typeof repairPatchButtons==="function") repairPatchButtons();
-  // keep calendar / active cards current without hard refresh
-  const activeEdit=!!document.querySelector("#editSheet.active");
-  if(!activeEdit) liveQueueRender();
-},1500);
+// Performance fix: removed the 1.5s full-app repaint loop.
+// Cross-tab updates still refresh when localStorage changes.
+window.addEventListener("storage", e=>{
+  if(e.key !== KEY) return;
+  try{
+    state = JSON.parse(localStorage.getItem(KEY)||"null") || state;
+  }catch(err){
+    console.warn("Could not reload saved state", err);
+  }
+  liveQueueRender("Updated");
+});
 
 setTimeout(()=>{
   liveQueueRender();
@@ -2393,7 +2476,7 @@ if(typeof saveShow==="function" && !window.__finalSaveShowPatched){
     if(typeof renderAll==="function") renderAll();
     setTimeout(()=>{
       if(typeof go==="function") go("tours");
-      document.querySelector(`[data-show-date="${targetDate}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
+      document.querySelector(`[data-show-date="${targetDate}"]`)?.scrollIntoView({behavior:"auto",block:"center"});
       if(typeof repairPatchButtons==="function") repairPatchButtons();
     },50);
   };
@@ -2408,7 +2491,7 @@ function fixedToggleFromCard(date,id,e){
   localStorage.setItem(KEY,JSON.stringify(state));
   if(typeof renderAll==="function") renderAll();
   setTimeout(()=>{
-    document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
+    document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"auto",block:"center"});
     if(typeof repairPatchButtons==="function") repairPatchButtons();
   },30);
 }
@@ -2896,7 +2979,7 @@ function moveShowBackToUpcoming(date,e){
   if(typeof renderAll==="function") renderAll();
   if(typeof setShowTab==="function") setShowTab("upcoming");
   setTimeout(()=>{
-    document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
+    document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"auto",block:"center"});
     if(typeof repairPatchButtons==="function") repairPatchButtons();
   },80);
 }
@@ -2933,7 +3016,7 @@ if(oldRenderShowsMoveBack && !window.__moveBackRenderShowsPatched){
     setTimeout(injectMoveBackButtons,0);
   };
 }
-setInterval(injectMoveBackButtons,700);
+// Performance fix: removed constant move-back button polling. Render wrappers inject this when needed.
 setTimeout(injectMoveBackButtons,250);
 
 
@@ -3080,7 +3163,7 @@ function cleanToggleStep(date,id,e){
   localStorage.setItem(KEY,JSON.stringify(state));
   cleanRenderTripSheet(date,true);
   if(typeof renderAll==="function") renderAll();
-  setTimeout(()=>document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"smooth",block:"center"}),40);
+  setTimeout(()=>document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"auto",block:"center"}),40);
 }
 function cleanOpenStep(date,id,e){
   if(e){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}
