@@ -1,9 +1,16 @@
-const CACHE_NAME = "lockleadhq-v1";
+const CACHE_NAME = "lockleadhq-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./manifest.json",
+  "./assets/red.jpg",
+  "./assets/crowd.jpg",
+  "./assets/booth.jpg",
+  "./assets/portrait.png",
+  "./assets/locklead_red.jpg",
+  "./assets/locklead_crowd.jpg",
+  "./assets/locklead_booth.jpg",
   "./js/state.js",
   "./js/calendar.js",
   "./js/shows.js",
