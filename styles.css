@@ -15,6 +15,25 @@
   --shadow:0 28px 85px rgba(0,0,0,.55);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+button,
+a,
+select,
+.colourChoice,
+.ideaSlide,
+.ideaRow,
+.smallRow,
+.docCard,
+.repairDoc,
+.day,
+.fileCard img,
+input[type="file"],
+.toggle,
+.actionLink,
+.contactGrid a,
+.repairContacts a,
+.repairAction{
+  cursor:pointer;
+}
 html{scroll-behavior:smooth}
 body{
   margin:0;
