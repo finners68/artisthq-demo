@@ -48,10 +48,17 @@ function contactActions(phone){
     <a target="_blank" href="https://wa.me/${digits}">WA Call</a>
   </div>`;
 }
+function docCardPreviewInner(f){
+  if(f.data && f.data.startsWith("data:image")) return `<img src="${f.data}">`;
+  if(f.url && isImageFile(f)) return `<img src="${f.url}">`;
+  const name = f.name || "Document";
+  return `<div class="safeFileFallback">Document<br>${name}</div>`;
+}
+
 function docsHTML(date){
   const s=show(date);
   if(!files(s).length) return "<p>No boarding cards uploaded.</p>";
-  return `<div class="docsGrid">`+files(s).map((f,i)=>`<div class="docCard" onclick="openFile('${date}',${i})">${f.data&&f.data.startsWith("data:image")?`<img src="${f.data}">`:"File"}<p>${f.name||"Document"}</p></div>`).join("")+`</div>`;
+  return `<div class="docsGrid">`+files(s).map((f,i)=>`<div class="docCard" onclick="openFile('${date}',${i})">${docCardPreviewInner(f)}<p>${f.name||"Document"}</p></div>`).join("")+`</div>`;
 }
 function openItinerary(date){ openTrip(date,false); }
 function openTrip(date,active){
@@ -153,7 +160,7 @@ function repairGet(date){
   return col[date];
 }
 function repairSave(){
-  localStorage.setItem(KEY, JSON.stringify(state));
+  persist();
 }
 function repairVal(s,a,b){
   return s[a] || (b ? s[b] : "") || "";
@@ -187,7 +194,7 @@ function repairDocsHTML(date){
   if(!fs.length) return "<p>No boarding cards uploaded.</p>";
   return `<div class="repairDocs">`+fs.map((f,i)=>`
     <div class="repairDoc" onclick="repairOpenFile('${date}',${i})">
-      ${f.data&&f.data.startsWith("data:image")?`<img src="${f.data}">`:"File"}
+      ${docCardPreviewInner(f)}
       <p>${f.name||"Document"}</p>
     </div>`).join("")+`</div>`;
 }

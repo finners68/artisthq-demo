@@ -67,18 +67,20 @@ function liveQueueRender(reason=""){
   });
 }
 function livePersist(msg){
-  localStorage.setItem(KEY, JSON.stringify(state));
+  persist();
   liveQueueRender(msg);
   if(msg) liveToast(msg);
 }
 const liveOriginalPersist = typeof persist === "function" ? persist : null;
 persist = function(){
   localStorage.setItem(KEY, JSON.stringify(state));
+  if(typeof queueSync === "function") queueSync();
   liveQueueRender();
 };
 const liveOriginalSave = typeof save === "function" ? save : null;
 save = function(){
   localStorage.setItem(KEY, JSON.stringify(state));
+  if(typeof queueSync === "function") queueSync();
   liveQueueRender("Saved");
 };
 
@@ -121,7 +123,7 @@ if(typeof saveShow === "function"){
       if(!state.shows[targetDate].files) state.shows[targetDate].files=[];
       if(!state.shows[targetDate].tripDone) state.shows[targetDate].tripDone={};
     }
-    localStorage.setItem(KEY,JSON.stringify(state));
+    persist();
     liveQueueRender("Show saved");
     setTimeout(()=>{
       if(typeof go==="function") go("tours");
@@ -285,7 +287,7 @@ document.addEventListener("input",e=>{
       delete state.shows[selectedDate];
     }
     selectedDate=date;
-    localStorage.setItem(KEY,JSON.stringify(state));
+    persist();
     liveQueueRender();
   },350);
 }, true);
@@ -387,7 +389,7 @@ if(typeof saveShow==="function" && !window.__finalSaveShowPatched){
       if(!state.shows[targetDate].files) state.shows[targetDate].files=[];
       if(!state.shows[targetDate].tripDone) state.shows[targetDate].tripDone={};
     }
-    localStorage.setItem(KEY,JSON.stringify(state));
+    persist();
     if(typeof renderAll==="function") renderAll();
     setTimeout(()=>{
       if(typeof go==="function") go("tours");
@@ -403,7 +405,7 @@ function fixedToggleFromCard(date,id,e){
   const s=(typeof repairGet==="function") ? repairGet(date) : show(date);
   if(!s.tripDone) s.tripDone={};
   s.tripDone[id]=!s.tripDone[id];
-  localStorage.setItem(KEY,JSON.stringify(state));
+  persist();
   if(typeof renderAll==="function") renderAll();
   setTimeout(()=>{
     document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
@@ -561,10 +563,7 @@ function safeDocsGridHTML(date){
   if(!fs.length) return "<p>No boarding cards uploaded.</p>";
   return `<div class="docsGrid">`+fs.map((f,i)=>{
     const name=safeEscape(f.name||"Document");
-    const data=String(f.data||"");
-    const isImage=data.startsWith("data:image");
-    const preview=isImage ? `<img src="${data}">` : `<div class="safeFileFallback">Document<br>${name}</div>`;
-    return `<div class="docCard" data-file-index="${i}" onclick="safeOpenUploadedFile('${date}',${i})">${preview}<p>${name}</p></div>`;
+    return `<div class="docCard" data-file-index="${i}" onclick="safeOpenUploadedFile('${date}',${i})">${docCardPreviewInner(f)}<p>${name}</p></div>`;
   }).join("")+`</div>`;
 }
 
@@ -800,7 +799,7 @@ document.addEventListener("click",function(e){
         const s = (typeof repairGet==="function") ? repairGet(date) : show(date);
         if(!s.tripDone) s.tripDone={};
         s.tripDone[id]=!s.tripDone[id];
-        localStorage.setItem(KEY,JSON.stringify(state));
+        persist();
         if(typeof renderAll==="function") renderAll();
       }
       return;
@@ -890,7 +889,7 @@ function moveShowBackToUpcoming(date,e){
   s.completed = false;
   s.tripActive = false;
   if(!s.tripDone) s.tripDone = {};
-  localStorage.setItem(KEY, JSON.stringify(state));
+  persist();
   if(typeof renderAll==="function") renderAll();
   if(typeof setShowTab==="function") setShowTab("upcoming");
   setTimeout(()=>{
@@ -971,9 +970,8 @@ function cleanDocsHTML(date){
   if(!fs.length) return "<p>No boarding cards uploaded.</p>";
   return `<div class="docsGrid">`+fs.map((f,i)=>{
     const name=String(f.name||"Document").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
-    const data=String(f.data||"");
     return `<div class="docCard" onclick="cleanOpenFile('${date}',${i},event)">
-      ${data.startsWith("data:image")?`<img src="${data}">`:`<div class="safeFileFallback">Document<br>${name}</div>`}
+      ${docCardPreviewInner(f)}
       <p>${name}</p>
     </div>`;
   }).join("")+`</div>`;
@@ -1075,7 +1073,7 @@ function cleanToggleStep(date,id,e){
   const s=cleanGetShow(date);
   if(!s.tripDone) s.tripDone={};
   s.tripDone[id]=!s.tripDone[id];
-  localStorage.setItem(KEY,JSON.stringify(state));
+  persist();
   cleanRenderTripSheet(date,true);
   if(typeof renderAll==="function") renderAll();
   setTimeout(()=>document.querySelector(`[data-show-date="${date}"]`)?.scrollIntoView({behavior:"smooth",block:"center"}),40);
@@ -1210,4 +1208,6 @@ if(photoRenderShowsBase && !window.__lockleadPhotoRenderShowsPatched){
 }
 setTimeout(applyLockleadPhotos,250);
 
-renderAll();
+if(!isSupabaseConfigured()){
+  renderAll();
+}

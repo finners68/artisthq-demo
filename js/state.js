@@ -27,7 +27,10 @@ if(!state.shows) state.shows = {};
 if(!state.ideas) state.ideas = [];
 if(!state.notes) state.notes = [];
 
-function persist(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+function persist(){
+  localStorage.setItem(KEY, JSON.stringify(state));
+  if(typeof queueSync === "function") queueSync();
+}
 function save(){ persist(); renderAll(); }
 function k(d){ return d.toISOString().slice(0,10); }
 function nice(date, opts={weekday:"short",day:"numeric",month:"short"}){ return new Date(date).toLocaleDateString("en-GB",opts); }

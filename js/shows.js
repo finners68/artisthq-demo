@@ -165,30 +165,43 @@ function deleteShow(){
 function handleUpload(e){
   const file=e.target.files[0];
   if(!file || !selectedDate) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const s=show(selectedDate);
-    if(!s.files) s.files=[];
-    s.files.push({name:file.name,type:file.type,data:reader.result});
-    persist();
-    renderFilePreview();
-  };
-  reader.readAsDataURL(file);
+  Promise.resolve(uploadShowFile(selectedDate, file))
+    .then(()=>renderFilePreview())
+    .catch(err=>{
+      console.error("Upload failed", err);
+      alert("Upload failed. Try a smaller image or screenshot.");
+    });
+  e.target.value="";
 }
-function renderFilePreview(){
+function fileCardPreviewHtml(f, date, i){
+  const inline = (f.data && f.data.startsWith("data:image")) ? f.data : (f.url && isImageFile(f) ? f.url : "");
+  const img = inline ? `<img src="${inline}" onclick="openFile('${date}',${i})">` : "";
+  return `<div class="fileCard">${img}<div class="fileCardName">${f.name}</div><button class="btn danger" style="width:100%;margin-top:8px" onclick="removeFile(${i})">Remove</button></div>`;
+}
+async function renderFilePreview(){
   const s=show(selectedDate);
-  filePreview.innerHTML=files(s).map((f,i)=>`<div class="fileCard">${f.data&&f.data.startsWith("data:image")?`<img src="${f.data}" onclick="openFile('${selectedDate}',${i})">`:""}<div class="fileCardName">${f.name}</div><button class="btn danger" style="width:100%;margin-top:8px" onclick="removeFile(${i})">Remove</button></div>`).join("");
+  const list=files(s);
+  await Promise.all(list.map(f=>f.storagePath && !f.data && !f.url ? resolveFileUrl(f) : null));
+  filePreview.innerHTML=list.map((f,i)=>fileCardPreviewHtml(f, selectedDate, i)).join("");
 }
 function removeFile(i){
   show(selectedDate).files.splice(i,1);
   persist();
   renderFilePreview();
 }
-function openFile(date,i){
+async function openFile(date,i){
   const f=show(date).files[i];
   if(!f) return;
   fileViewerTitle.textContent=f.name||"Document";
-  fileViewerContent.innerHTML=f.data&&f.data.startsWith("data:image")?`<img style="width:100%;border-radius:20px;border:1px solid var(--line)" src="${f.data}">`:`<a class="actionLink" href="${f.data}" download="${f.name}">Download / open file</a>`;
+  let src=f.data||f.url||"";
+  if(!src && f.storagePath) src=await resolveFileUrl(f);
+  if(src && isImageFile(f)){
+    fileViewerContent.innerHTML=`<img style="width:100%;border-radius:20px;border:1px solid var(--line)" src="${src}">`;
+  }else if(src){
+    fileViewerContent.innerHTML=`<a class="actionLink" href="${src}" download="${f.name}" target="_blank" rel="noopener">Download / open file</a>`;
+  }else{
+    fileViewerContent.innerHTML=`<p>Could not load this document preview.</p>`;
+  }
   fileViewer.classList.add("active");
 }
 function closeFile(){ fileViewer.classList.remove("active"); }

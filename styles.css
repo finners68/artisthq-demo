@@ -742,3 +742,27 @@ body.modal-open{overflow:hidden}
   z-index:1;
 }
 
+/* Auth */
+body.auth-locked .app,
+body.auth-locked .bottomNav{
+  visibility:hidden;
+  pointer-events:none;
+}
+.authSheet{
+  z-index:200;
+}
+.authSheet .sheet{
+  max-height:92vh;
+}
+.authMessage{
+  min-height:18px;
+  font-size:12px;
+  color:var(--orange);
+  margin:4px 0 0;
+}
+.signOutBtn{
+  margin-top:12px;
+  width:100%;
+  max-width:220px;
+}
+
